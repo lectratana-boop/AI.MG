@@ -1,246 +1,156 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI.MG</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
-
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
-<style>
-body { background:#0a0a0f; color:white; font-family: Inter; }
-.glass { background:rgba(255,255,255,0.05); backdrop-filter:blur(20px); }
-.active { background:#6366f1; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI.MG - Privé</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #08080a; color: #f1f5f9; }
+        .glass { background: rgba(18, 18, 22, 0.8); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.05); }
+        .paid { border-left: 4px solid #10b981; }
+        .unpaid { border-left: 4px solid #ef4444; }
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
+<body x-data="aimg()" x-init="init()">
 
-<body x-data="app()" x-init="init()">
+    <div x-show="showSplash" class="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center">
+        <video id="v" autoplay muted playsinline class="w-full h-full object-cover" @ended="showSplash = false">
+            <source src="splash.mp4" type="video/mp4">
+        </video>
+        <div class="absolute bottom-10">
+            <button @click="showSplash = false" class="px-6 py-2 bg-white/10 rounded-full text-xs border border-white/20">Passer l'intro</button>
+        </div>
+    </div>
 
-<!-- SPLASH -->
-<template x-if="showSplash">
-<div class="fixed inset-0 z-50">
-<video autoplay muted playsinline class="w-full h-full object-cover"
-@ended="showSplash=false">
-<source src="splash.mp4" type="video/mp4">
-</video>
-</div>
-</template>
+    <div x-show="!showSplash && !isLoggedIn" class="min-h-screen flex items-center justify-center p-6" x-cloak>
+        <div class="glass p-8 rounded-[2rem] w-full max-w-sm text-center">
+            <h1 class="text-3xl font-black mb-8 text-indigo-500">AI.MG</h1>
+            <div class="space-y-4">
+                <input type="email" x-model="form.email" placeholder="Email" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-indigo-500">
+                <input type="password" x-model="form.pass" placeholder="Mot de passe" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-indigo-500">
+                <button @click="login" class="w-full bg-indigo-600 py-4 rounded-xl font-bold">Connexion</button>
+                <p x-text="error" class="text-red-400 text-xs"></p>
+            </div>
+        </div>
+    </div>
 
-<!-- LOGIN -->
-<template x-if="!showSplash && !isLogged">
-<div class="flex items-center justify-center h-screen">
-<div class="glass p-8 rounded-3xl w-[350px] text-center">
+    <div x-show="isLoggedIn" class="flex flex-col h-screen" x-cloak>
+        <header class="p-6 flex justify-between items-center glass">
+            <span class="font-black text-xl tracking-tighter">AI.MG</span>
+            <span class="text-xs bg-indigo-600/20 text-indigo-400 px-3 py-1 rounded-full capitalize" x-text="tab"></span>
+        </header>
 
-<h1 class="text-3xl font-bold mb-6">AI.MG</h1>
+        <main class="flex-1 overflow-y-auto p-4 pb-24">
+            
+            <div x-show="tab === 'portefeuille'" class="space-y-6">
+                <div class="glass p-8 rounded-[2rem] text-center">
+                    <p class="text-xs text-gray-500 uppercase mb-2">Salaire Mensuel</p>
+                    <input type="number" x-model.number="db.salary" class="bg-transparent text-5xl font-black text-white text-center w-full focus:outline-none">
+                    <p class="text-xs text-indigo-400 mt-4">NET MENSUEL : <span class="text-xl font-bold" x-text="formatAr(db.salary - calcTotalPaid())"></span></p>
+                </div>
+            </div>
 
-<input x-model="email" placeholder="Email"
-class="w-full p-3 mb-3 rounded-xl bg-black/40">
+            <div x-show="tab === 'facturation'" class="space-y-3">
+                <template x-for="(f, id) in db.bills">
+                    <div @click="openBill(id)" class="glass p-4 rounded-2xl flex justify-between items-center transition-all active:scale-95" :class="f.paid ? 'paid' : 'unpaid'">
+                        <div class="flex items-center gap-3">
+                            <span class="text-xl" x-text="f.emoji"></span>
+                            <div>
+                                <p class="text-sm font-bold" x-text="f.label"></p>
+                                <p class="text-[10px] text-gray-500" x-text="f.paid ? 'Payé' : 'En attente'"></p>
+                            </div>
+                        </div>
+                        <span class="font-bold text-sm" x-text="formatAr(f.amount)"></span>
+                    </div>
+                </template>
+            </div>
+        </main>
 
-<input type="password" x-model="password"
-placeholder="Mot de passe"
-class="w-full p-3 mb-4 rounded-xl bg-black/40">
+        <nav class="fixed bottom-0 inset-x-0 glass h-20 flex justify-around items-center border-t border-white/5">
+            <button @click="tab='portefeuille'" :class="tab==='portefeuille'?'text-indigo-500':''"><i data-lucide="wallet"></i></button>
+            <button @click="tab='facturation'" :class="tab==='facturation'?'text-indigo-500':''"><i data-lucide="receipt"></i></button>
+            <button @click="tab='tache'" :class="tab==='tache'?'text-indigo-500':''"><i data-lucide="calendar"></i></button>
+            <button @click="tab='aiza'" :class="tab==='aiza'?'text-indigo-500':''"><i data-lucide="map-pin"></i></button>
+        </nav>
 
-<button @click="login"
-class="w-full bg-indigo-600 py-3 rounded-xl">
-Connexion
-</button>
+        <div x-show="showModal" class="fixed inset-0 z-50 flex items-end justify-center bg-black/80 p-4" x-cloak>
+            <div class="glass w-full max-w-sm p-8 rounded-[2.5rem] animate-slide-up">
+                <div class="flex justify-between items-start mb-6">
+                    <h2 class="text-2xl font-bold" x-text="db.bills[activeId]?.label"></h2>
+                    <button @click="showModal = false" class="p-2 bg-white/5 rounded-full">✕</button>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <label class="text-xs text-gray-500 uppercase">Prix de consommation</label>
+                        <input type="number" x-model.number="db.bills[activeId].amount" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl mt-2 outline-none text-2xl font-bold">
+                    </div>
+                    <button @click="togglePaid()" :class="db.bills[activeId]?.paid ? 'bg-green-600' : 'bg-red-600'" class="w-full py-4 rounded-xl font-bold text-white transition-colors" x-text="db.bills[activeId]?.paid ? 'PAYÉ' : 'MARQUER COMME PAYÉ'"></button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<p class="text-red-400 text-sm mt-2" x-text="error"></p>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBY_zHJAaNLtXDBlD1TYMzALlMlMHNBwWk",
+            authDomain: "aiza-38b31.firebaseapp.com",
+            databaseURL: "https://aiza-38b31-default-rtdb.europe-west1.firebasedatabase.app/",
+            projectId: "aiza-38b31",
+            storageBucket: "aiza-38b31.firebasestorage.app",
+            messagingSenderId: "850157491678",
+            appId: "1:850157491678:web:614b2b70b934cf09fcb94f"
+        };
+        firebase.initializeApp(firebaseConfig);
 
-</div>
-</div>
-</template>
-
-<!-- APP -->
-<div x-show="isLogged" class="flex h-screen">
-
-<!-- MENU -->
-<div class="w-64 glass p-4 space-y-3">
-
-<h2 class="text-xl font-bold mb-6">AI.MG</h2>
-
-<template x-for="m in menu">
-<button @click="tab=m"
-:class="tab===m ? 'active' : ''"
-class="w-full text-left p-3 rounded-xl">
-<span x-text="m"></span>
-</button>
-</template>
-
-<button @click="logout" class="mt-10 text-red-400">
-Déconnexion
-</button>
-
-</div>
-
-<!-- CONTENU -->
-<div class="flex-1 p-6 overflow-auto">
-
-<!-- PORTEFEUILLE -->
-<div x-show="tab==='Portefeuille'">
-
-<h2 class="text-2xl mb-4">Portefeuille</h2>
-
-<input type="number" x-model.number="salary"
-placeholder="Salaire"
-class="p-3 rounded-xl bg-black/40 mb-4">
-
-<div class="space-y-2">
-<template x-for="c in categories">
-<div class="flex justify-between bg-black/30 p-3 rounded-xl">
-<span x-text="c"></span>
-<span x-text="getTotal(c) + ' Ar'"></span>
-</div>
-</template>
-</div>
-
-<div class="mt-6 text-xl">
-Net : <span x-text="net()"></span>
-</div>
-
-</div>
-
-<!-- FACTURATION -->
-<div x-show="tab==='Facturation'">
-
-<h2 class="text-2xl mb-4">Facturation</h2>
-
-<template x-for="(items,cat) in factures">
-<div class="mb-6">
-
-<h3 class="font-bold mb-2" x-text="cat"></h3>
-
-<template x-for="item in items">
-<div class="flex justify-between items-center bg-black/30 p-3 rounded-xl mb-2">
-
-<span x-text="item.name"></span>
-
-<div class="flex gap-2">
-<input type="number" x-model.number="item.value"
-class="w-24 p-2 bg-black/40 rounded">
-
-<button @click="item.paid=!item.paid"
-:class="item.paid ? 'bg-green-500' : 'bg-red-500'"
-class="px-3 rounded">
-✔
-</button>
-</div>
-
-</div>
-</template>
-
-</div>
-</template>
-
-</div>
-
-<!-- TACHE -->
-<div x-show="tab==='Tache'">
-<h2 class="text-2xl mb-4">Calendrier</h2>
-
-<textarea placeholder="Ajouter tâche..."
-class="w-full p-3 bg-black/40 rounded"></textarea>
-</div>
-
-<!-- LOCALISATION -->
-<div x-show="tab==='Localisation'">
-<h2 class="text-2xl">Localisation (AIZA)</h2>
-<p>Suivi des objets maison / store</p>
-</div>
-
-<!-- DIVERS -->
-<div x-show="tab==='Divers'">
-<h2 class="text-2xl">Divers</h2>
-<button class="bg-indigo-600 p-2 rounded">Rename catégorie</button>
-</div>
-
-</div>
-</div>
-
-<script>
-var firebaseConfig = {
-apiKey: "YOUR_KEY",
-authDomain: "YOUR_DOMAIN",
-databaseURL: "YOUR_DB",
-};
-firebase.initializeApp(firebaseConfig);
-
-function app(){
-return{
-showSplash:true,
-isLogged:false,
-email:'',
-password:'',
-error:'',
-tab:'Portefeuille',
-
-menu:['Portefeuille','Facturation','Tache','Localisation','Divers'],
-
-salary:0,
-
-categories:['Logement','Services','Education','Medical','Transport','Loisir'],
-
-factures:{
-Logement:[
-{name:'Loyer',value:0,paid:false},
-{name:'JIRAMA',value:0,paid:false}
-],
-Services:[
-{name:'Internet',value:0,paid:false},
-{name:'Téléphone',value:0,paid:false}
-],
-Education:[
-{name:'Ecolage',value:0,paid:false}
-],
-Medical:[
-{name:'Consultation',value:0,paid:false}
-],
-Transport:[
-{name:'Carburant',value:0,paid:false}
-],
-Loisir:[
-{name:'Sorties',value:0,paid:false},
-{name:'ADIDY',value:0,paid:false}
-]
-},
-
-init(){
-setTimeout(()=>this.showSplash=false,30000)
-},
-
-login(){
-firebase.auth().signInWithEmailAndPassword(this.email,this.password)
-.then(()=>this.isLogged=true)
-.catch(()=>this.error="Erreur login")
-},
-
-logout(){
-firebase.auth().signOut().then(()=>location.reload())
-},
-
-getTotal(cat){
-return this.factures[cat]
-.filter(i=>i.paid)
-.reduce((t,i)=>t+i.value,0)
-},
-
-net(){
-let total=0
-for(let c in this.factures){
-total+=this.getTotal(c)
-}
-return (this.salary-total)+" Ar"
-}
-
-}
-}
-</script>
-
+        function aimg() {
+            return {
+                showSplash: true,
+                isLoggedIn: false,
+                tab: 'portefeuille',
+                showModal: false,
+                activeId: null,
+                form: { email: '', pass: '' },
+                error: '',
+                db: {
+                    salary: 0,
+                    bills: {
+                        loyer: { label: 'Loyer', amount: 0, paid: false, emoji: '🏠' },
+                        jirama: { label: 'JIRAMA', amount: 0, paid: false, emoji: '⚡' },
+                        internet: { label: 'Internet / Wi-Fi', amount: 0, paid: false, emoji: '🌐' },
+                        ecolage: { label: 'Écolage', amount: 0, paid: false, emoji: '🎓' },
+                        repas: { label: 'Repas Quotidien', amount: 0, paid: false, emoji: '🍽️' },
+                        carburant: { label: 'Carburant', amount: 0, paid: false, emoji: '🚗' }
+                    }
+                },
+                init() {
+                    setTimeout(() => { this.showSplash = false; lucide.createIcons(); }, 8000);
+                },
+                login() {
+                    firebase.auth().signInWithEmailAndPassword(this.form.email, this.form.pass)
+                        .then(u => { this.isLoggedIn = true; this.sync(u.user.uid); })
+                        .catch(e => { this.error = "Accès refusé"; });
+                },
+                sync(uid) {
+                    const ref = firebase.database().ref('aimg_private/' + uid);
+                    ref.on('value', s => { if(s.exists()) this.db = s.val(); });
+                    this.$watch('db', v => ref.set(JSON.parse(JSON.stringify(v))), {deep:true});
+                },
+                openBill(id) { this.activeId = id; this.showModal = true; },
+                togglePaid() { this.db.bills[this.activeId].paid = !this.db.bills[this.activeId].paid; },
+                calcTotalPaid() {
+                    return Object.values(this.db.bills).reduce((t, b) => t + (b.paid ? b.amount : 0), 0);
+                },
+                formatAr(v) { return new Intl.NumberFormat('fr-FR').format(v || 0) + ' Ar'; }
+            }
+        }
+    </script>
 </body>
 </html>
